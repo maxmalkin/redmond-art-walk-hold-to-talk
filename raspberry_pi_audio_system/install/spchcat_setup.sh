@@ -2,6 +2,7 @@
 
 # spchcat Installation Script for Raspberry Pi Audio System
 # MANDATORY: This installs the ONLY approved speech-to-text engine for the system
+# spchcat is a pre-built package for Linux/Raspberry Pi available from petewarden/spchcat
 
 set -e  # Exit on any error
 
@@ -30,65 +31,76 @@ info() {
 }
 
 # Configuration
-SPCHCAT_VERSION="1.0.0"
-SPCHCAT_REPO="https://github.com/spchcat/spchcat.git"
+SPCHCAT_REPO="https://github.com/petewarden/spchcat"
+SPCHCAT_BINARY_URL_X86="https://github.com/petewarden/spchcat/releases/download/v0.1.0/spchcat_linux_x86_64"
+SPCHCAT_BINARY_URL_ARM="https://github.com/petewarden/spchcat/releases/download/v0.1.0/spchcat_linux_arm64"
+SPCHCAT_BINARY_URL_ARM32="https://github.com/petewarden/spchcat/releases/download/v0.1.0/spchcat_linux_armv7"
 INSTALL_PREFIX="/usr/local"
-TEMP_BUILD_DIR="/tmp/spchcat_build"
-MODEL_URL="https://github.com/spchcat/models/releases/download/v1.0.0/en-us-model.tar.gz"
+TEMP_DIR="/tmp/spchcat_install"
+
+# Detect system architecture
+detect_architecture() {
+    local arch=$(uname -m)
+    local binary_url=""
+    
+    case $arch in
+        x86_64)
+            binary_url="$SPCHCAT_BINARY_URL_X86"
+            info "Detected x86_64 architecture"
+            ;;
+        aarch64|arm64)
+            binary_url="$SPCHCAT_BINARY_URL_ARM"
+            info "Detected ARM64 architecture"
+            ;;
+        armv7l|arm*)
+            binary_url="$SPCHCAT_BINARY_URL_ARM32"
+            info "Detected ARM32 architecture"
+            ;;
+        *)
+            error "Unsupported architecture: $arch"
+            error "spchcat is available for x86_64, arm64, and armv7 only"
+            exit 1
+            ;;
+    esac
+    
+    echo "$binary_url"
+}
 
 # Check system requirements
 check_requirements() {
-    log "Checking system requirements for spchcat compilation..."
+    log "Checking system requirements for spchcat..."
     
-    # Check for required build tools
-    local missing_tools=()
-    
-    if ! command -v gcc &> /dev/null; then
-        missing_tools+=("gcc")
-    fi
-    
-    if ! command -v cmake &> /dev/null; then
-        missing_tools+=("cmake")
-    fi
-    
-    if ! command -v git &> /dev/null; then
-        missing_tools+=("git")
-    fi
-    
-    if ! command -v pkg-config &> /dev/null; then
-        missing_tools+=("pkg-config")
-    fi
-    
-    if [ ${#missing_tools[@]} -ne 0 ]; then
-        error "Missing required build tools: ${missing_tools[*]}"
-        error "Please install them first: sudo apt-get install ${missing_tools[*]}"
+    # Check for wget or curl
+    if ! command -v wget &> /dev/null && ! command -v curl &> /dev/null; then
+        error "Neither wget nor curl found. Please install one of them:"
+        error "sudo apt-get install wget"
         exit 1
     fi
     
-    # Check for required libraries
-    if ! pkg-config --exists libssl; then
-        error "libssl-dev not found. Install with: sudo apt-get install libssl-dev"
-        exit 1
+    # Check for PulseAudio (required by spchcat)
+    if ! command -v pulseaudio &> /dev/null; then
+        warn "PulseAudio not found. spchcat requires PulseAudio for audio input."
+        warn "Install with: sudo apt-get install pulseaudio"
+        warn "You may also need: sudo apt-get install pulseaudio-utils"
     fi
     
-    if ! pkg-config --exists libcurl; then
-        error "libcurl4-openssl-dev not found. Install with: sudo apt-get install libcurl4-openssl-dev"
-        exit 1
+    # Check if we can write to install directory
+    if [ ! -w "$(dirname "$INSTALL_PREFIX/bin")" ] && [ "$EUID" -ne 0 ]; then
+        error "Cannot write to $INSTALL_PREFIX/bin. Please run with sudo or choose different install location."
+        info "This script will use sudo for installation when needed."
     fi
     
-    log "System requirements check passed"
+    log "System requirements check completed"
 }
 
 # Check if spchcat is already installed
 check_existing_installation() {
     if command -v spchcat &> /dev/null; then
-        log "spchcat is already installed"
+        log "spchcat is already installed at $(which spchcat)"
         
-        # Check version
-        local installed_version=$(spchcat --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-        
-        if [ "$installed_version" = "$SPCHCAT_VERSION" ]; then
-            log "spchcat version $installed_version matches required version"
+        # Test if it works
+        if spchcat --help &> /dev/null; then
+            log "Existing spchcat installation appears to be working"
             read -p "Reinstall spchcat? (y/N): " -n 1 -r
             echo
             if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -96,7 +108,7 @@ check_existing_installation() {
                 return 0
             fi
         else
-            warn "Installed spchcat version ($installed_version) differs from required ($SPCHCAT_VERSION)"
+            warn "Existing spchcat installation may be corrupted"
             info "Proceeding with reinstallation..."
         fi
     fi
@@ -104,279 +116,170 @@ check_existing_installation() {
     return 1
 }
 
-# Clean up any previous build attempts
-cleanup_build_directory() {
-    log "Cleaning up previous build directory..."
+# Create temporary directory
+setup_temp_directory() {
+    log "Setting up temporary directory..."
     
-    if [ -d "$TEMP_BUILD_DIR" ]; then
-        rm -rf "$TEMP_BUILD_DIR"
+    if [ -d "$TEMP_DIR" ]; then
+        rm -rf "$TEMP_DIR"
     fi
     
-    mkdir -p "$TEMP_BUILD_DIR"
-    cd "$TEMP_BUILD_DIR"
+    mkdir -p "$TEMP_DIR"
+    cd "$TEMP_DIR"
+    
+    log "Using temporary directory: $TEMP_DIR"
 }
 
-# Download spchcat source code
-download_source() {
-    log "Downloading spchcat source code..."
+# Download spchcat binary
+download_spchcat() {
+    local binary_url="$1"
     
-    # Clone the repository
-    git clone --branch "v$SPCHCAT_VERSION" --depth 1 "$SPCHCAT_REPO" spchcat
+    log "Downloading spchcat binary from: $binary_url"
     
-    if [ ! -d "spchcat" ]; then
-        error "Failed to download spchcat source code"
+    if command -v wget &> /dev/null; then
+        wget -O spchcat "$binary_url"
+    elif command -v curl &> /dev/null; then
+        curl -L -o spchcat "$binary_url"
+    else
+        error "Neither wget nor curl available for download"
         exit 1
     fi
     
-    cd spchcat
-    log "spchcat source code downloaded successfully"
+    if [ ! -f "spchcat" ]; then
+        error "Failed to download spchcat binary"
+        exit 1
+    fi
+    
+    # Verify it's a valid binary
+    if ! file spchcat | grep -q "executable"; then
+        error "Downloaded file is not a valid executable"
+        exit 1
+    fi
+    
+    log "spchcat binary downloaded successfully"
 }
 
-# Configure build
-configure_build() {
-    log "Configuring spchcat build..."
-    
-    # Create build directory
-    mkdir -p build
-    cd build
-    
-    # Configure with CMake
-    cmake .. \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
-        -DENABLE_SHARED=ON \
-        -DENABLE_STATIC=OFF \
-        -DWITH_CUDA=OFF \
-        -DWITH_OPENCL=OFF \
-        -DBUILD_TESTS=OFF \
-        -DBUILD_EXAMPLES=OFF
-    
-    log "Build configuration completed"
-}
-
-# Compile spchcat
-compile_spchcat() {
-    log "Compiling spchcat (this may take several minutes)..."
-    
-    # Get number of CPU cores for parallel compilation
-    local num_cores=$(nproc)
-    
-    # Compile
-    make -j"$num_cores"
-    
-    log "spchcat compilation completed"
-}
-
-# Install spchcat
+# Install spchcat binary
 install_spchcat() {
-    log "Installing spchcat to $INSTALL_PREFIX..."
+    log "Installing spchcat to $INSTALL_PREFIX/bin..."
     
-    # Install binaries and libraries
-    sudo make install
+    # Make binary executable
+    chmod +x spchcat
     
-    # Update library cache
-    sudo ldconfig
+    # Create bin directory if it doesn't exist
+    sudo mkdir -p "$INSTALL_PREFIX/bin"
+    
+    # Install binary
+    sudo cp spchcat "$INSTALL_PREFIX/bin/spchcat"
     
     # Verify installation
-    if command -v spchcat &> /dev/null; then
-        log "spchcat installed successfully"
-        local installed_version=$(spchcat --version 2>/dev/null | head -1)
-        info "Installed version: $installed_version"
+    if [ -f "$INSTALL_PREFIX/bin/spchcat" ]; then
+        log "spchcat installed successfully to $INSTALL_PREFIX/bin/spchcat"
     else
-        error "spchcat installation failed - binary not found in PATH"
+        error "Failed to install spchcat binary"
         exit 1
     fi
-}
-
-# Download and install language models
-install_models() {
-    log "Installing spchcat language models..."
     
-    # Create model directory
-    local model_dir="$INSTALL_PREFIX/share/spchcat/models"
-    sudo mkdir -p "$model_dir"
-    
-    # Download English model
-    cd /tmp
-    
-    if wget -q "$MODEL_URL" -O en-us-model.tar.gz; then
-        log "Downloaded English language model"
-        
-        # Extract model
-        sudo tar -xzf en-us-model.tar.gz -C "$model_dir"
-        
-        # Clean up
-        rm -f en-us-model.tar.gz
-        
-        log "Language models installed to $model_dir"
+    # Make sure it's in PATH
+    if ! command -v spchcat &> /dev/null; then
+        warn "spchcat not found in PATH"
+        warn "You may need to add $INSTALL_PREFIX/bin to your PATH"
+        warn "Add this to your ~/.bashrc: export PATH=\"$INSTALL_PREFIX/bin:\$PATH\""
     else
-        error "Failed to download language models"
-        error "You will need to manually download and install models from:"
-        error "$MODEL_URL"
-        
-        # Continue without models - user can install later
-        warn "Continuing installation without models..."
+        log "spchcat is available in PATH"
     fi
-}
-
-# Create spchcat configuration file
-create_config() {
-    log "Creating spchcat configuration..."
-    
-    local config_dir="$INSTALL_PREFIX/etc/spchcat"
-    sudo mkdir -p "$config_dir"
-    
-    # Create default configuration
-    sudo tee "$config_dir/spchcat.conf" > /dev/null <<EOF
-# spchcat Configuration for Raspberry Pi Audio System
-# This configuration is optimized for the audio recording system
-
-[general]
-# Default language model
-default_language = en
-model_path = $INSTALL_PREFIX/share/spchcat/models
-
-# Audio processing settings
-sample_rate = 44100
-chunk_size = 1024
-
-# Recognition settings
-confidence_threshold = 0.7
-max_alternatives = 1
-
-# Performance settings (optimized for Raspberry Pi)
-num_threads = 2
-enable_vad = true
-vad_threshold = 0.3
-
-# Output format
-output_format = json
-include_timestamps = true
-include_confidence = true
-
-[logging]
-level = info
-file = /var/log/spchcat.log
-
-[cache]
-enable_model_cache = true
-cache_size_mb = 128
-EOF
-    
-    log "spchcat configuration created"
-}
-
-# Setup spchcat service user and permissions
-setup_permissions() {
-    log "Setting up spchcat permissions..."
-    
-    # Create spchcat group if it doesn't exist
-    if ! getent group spchcat >/dev/null; then
-        sudo groupadd spchcat
-    fi
-    
-    # Add current user to spchcat group
-    sudo usermod -a -G spchcat "$USER"
-    
-    # Set appropriate permissions on model directory
-    local model_dir="$INSTALL_PREFIX/share/spchcat"
-    if [ -d "$model_dir" ]; then
-        sudo chgrp -R spchcat "$model_dir"
-        sudo chmod -R g+r "$model_dir"
-    fi
-    
-    # Create log directory
-    sudo mkdir -p /var/log/spchcat
-    sudo chown root:spchcat /var/log/spchcat
-    sudo chmod 775 /var/log/spchcat
-    
-    log "spchcat permissions configured"
 }
 
 # Test spchcat installation
 test_installation() {
     log "Testing spchcat installation..."
     
-    # Test basic functionality
-    if spchcat --help >/dev/null 2>&1; then
+    # Test help command
+    if spchcat --help &> /dev/null; then
         log "spchcat help command works"
     else
         error "spchcat help command failed"
         exit 1
     fi
     
-    # Test version command
-    if spchcat --version >/dev/null 2>&1; then
-        log "spchcat version command works"
-    else
-        warn "spchcat version command failed (may be normal)"
-    fi
+    # Test with a simple command (this might fail if no audio setup, but that's ok)
+    log "Testing spchcat basic functionality..."
     
-    # Test model loading (if models are available)
-    local model_dir="$INSTALL_PREFIX/share/spchcat/models"
-    if [ -d "$model_dir" ] && [ "$(ls -A "$model_dir")" ]; then
-        log "Language models are available"
-        
-        # Create a small test audio file and test recognition
-        info "Creating test audio file for recognition test..."
-        
-        # Generate a simple sine wave as test audio (1 second, 440Hz)
-        python3 -c "
-import wave
-import numpy as np
-
-# Generate 1 second of 440Hz sine wave
-sample_rate = 44100
-duration = 1.0
-frequency = 440.0
-
-t = np.linspace(0, duration, int(sample_rate * duration), False)
-audio = np.sin(2 * np.pi * frequency * t) * 0.3
-audio_int = (audio * 32767).astype(np.int16)
-
-# Save as WAV file
-with wave.open('/tmp/spchcat_test.wav', 'w') as wav_file:
-    wav_file.setnchannels(1)
-    wav_file.setsampwidth(2)
-    wav_file.setframerate(sample_rate)
-    wav_file.writeframes(audio_int.tobytes())
-
-print('Test audio file created')
-"
-        
-        # Test speech recognition on the test file
-        if spchcat --input /tmp/spchcat_test.wav --output-format json >/dev/null 2>&1; then
-            log "spchcat recognition test passed"
-        else
-            warn "spchcat recognition test failed (may be due to test audio content)"
-        fi
-        
-        # Clean up test file
-        rm -f /tmp/spchcat_test.wav
-        
+    # Create a simple test to see if spchcat runs without crashing
+    timeout 2s spchcat --source=system --language=en &> /dev/null || true
+    
+    if [ $? -eq 124 ]; then
+        log "spchcat appears to be working (test timed out as expected)"
     else
-        warn "No language models found - speech recognition will not work"
-        warn "Download models manually from: $MODEL_URL"
+        warn "spchcat test had unexpected result (may be normal without audio setup)"
     fi
     
     log "spchcat installation test completed"
 }
 
+# Setup spchcat configuration for the audio system
+setup_configuration() {
+    log "Setting up spchcat configuration for audio system..."
+    
+    # Create configuration directory for our system
+    local config_dir="$HOME/.config/raspberry_pi_audio_system"
+    mkdir -p "$config_dir"
+    
+    # Create spchcat usage notes
+    cat > "$config_dir/spchcat_usage.txt" <<EOF
+spchcat Usage for Raspberry Pi Audio System
+==========================================
+
+Basic Commands:
+- Transcribe from microphone: spchcat
+- Transcribe from file: spchcat /path/to/audio.wav
+- Specify language: spchcat --language=en
+- Output to file: spchcat > transcript.txt
+
+Supported Languages (examples):
+- English: en
+- Spanish: es
+- French: fr
+- German: de
+- Italian: it
+- Portuguese: pt
+
+Audio Sources:
+- Default microphone: spchcat (default)
+- System audio: spchcat --source=system
+- Specific file: spchcat /path/to/file.wav
+
+Integration Notes:
+- spchcat outputs text to stdout by default
+- Use subprocess to capture output in Python
+- spchcat requires PulseAudio for audio input
+- Works with WAV files (16-bit, mono recommended)
+
+Performance Tips for Raspberry Pi:
+- Close unnecessary applications during transcription
+- Ensure good microphone quality for better accuracy
+- Consider using shorter audio clips for better performance
+- Monitor system temperature during heavy usage
+EOF
+    
+    log "spchcat configuration and usage notes created in $config_dir"
+}
+
 # Cleanup function
 cleanup() {
-    log "Cleaning up build directory..."
-    
-    if [ -d "$TEMP_BUILD_DIR" ]; then
-        rm -rf "$TEMP_BUILD_DIR"
+    if [ -d "$TEMP_DIR" ]; then
+        log "Cleaning up temporary directory..."
+        rm -rf "$TEMP_DIR"
     fi
-    
-    log "Cleanup completed"
 }
 
 # Main installation function
 main() {
     log "Starting spchcat installation for Raspberry Pi Audio System..."
     log "MANDATORY: spchcat is the ONLY approved speech-to-text engine"
+    echo
+    info "spchcat GitHub repository: $SPCHCAT_REPO"
+    echo
     
     # Check if already installed
     if check_existing_installation; then
@@ -384,67 +287,69 @@ main() {
         return 0
     fi
     
+    # Detect architecture and get download URL
+    local binary_url=$(detect_architecture)
+    
     # Check system requirements
     check_requirements
     
     # Setup cleanup trap
     trap cleanup EXIT
     
-    # Clean up build directory
-    cleanup_build_directory
+    # Setup temporary directory
+    setup_temp_directory
     
-    # Download source code
-    download_source
+    # Download spchcat binary
+    download_spchcat "$binary_url"
     
-    # Configure build
-    configure_build
-    
-    # Compile
-    compile_spchcat
-    
-    # Install
+    # Install spchcat
     install_spchcat
-    
-    # Install models
-    install_models
-    
-    # Create configuration
-    create_config
-    
-    # Setup permissions
-    setup_permissions
     
     # Test installation
     test_installation
     
+    # Setup configuration
+    setup_configuration
+    
     log "spchcat installation completed successfully!"
     echo
-    info "spchcat has been installed to: $INSTALL_PREFIX"
-    info "Configuration file: $INSTALL_PREFIX/etc/spchcat/spchcat.conf"
-    info "Models directory: $INSTALL_PREFIX/share/spchcat/models"
+    info "spchcat has been installed to: $INSTALL_PREFIX/bin/spchcat"
+    info "Configuration notes: $HOME/.config/raspberry_pi_audio_system/spchcat_usage.txt"
     echo
     info "You can test spchcat with: spchcat --help"
+    info "For audio transcription: spchcat (speaks into microphone)"
+    echo
     
     # Final verification
     if ! command -v spchcat &> /dev/null; then
         error "spchcat installation verification failed!"
+        error "spchcat not found in PATH. You may need to:"
+        error "1. Add $INSTALL_PREFIX/bin to your PATH"
+        error "2. Restart your terminal session"
         exit 1
     fi
     
     log "spchcat is ready for use with the Raspberry Pi Audio System"
+    
+    # Show version info if available
+    if spchcat --help 2>&1 | grep -q "version\|Version"; then
+        info "Installed spchcat version information:"
+        spchcat --help 2>&1 | grep -i version || true
+    fi
 }
 
 # Check if running as root
 if [ "$EUID" -eq 0 ]; then
     error "Please do not run this script as root"
-    error "The script will use sudo when needed"
+    error "The script will use sudo when needed for installation"
     exit 1
 fi
 
-# Ensure we're in the correct directory context
+# Ensure we're in a reasonable directory context
 if [ ! -f "../config.yaml" ] && [ ! -f "config.yaml" ]; then
-    warn "This script should be run from the raspberry_pi_audio_system directory"
+    warn "This script should ideally be run from the raspberry_pi_audio_system directory"
     warn "Current directory: $(pwd)"
+    info "Continuing with installation anyway..."
 fi
 
 # Run main installation

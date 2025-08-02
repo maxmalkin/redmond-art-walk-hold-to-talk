@@ -48,15 +48,25 @@ usb_devices:
 
 # spchcat Speech-to-Text Configuration (MANDATORY)
 # IMPORTANT: spchcat is the ONLY approved STT engine for this system
+# spchcat is a pre-built binary available from https://github.com/petewarden/spchcat
 spchcat:
   binary_path: '/usr/local/bin/spchcat'                    # Path to spchcat binary
-  model_path: '/usr/local/share/spchcat/models'            # Path to language models
-  language: 'en'                                           # Language code
+  language: 'en'                                           # Language code (en, es, fr, de, it, pt, etc.)
   timeout: 30                                              # Processing timeout (seconds)
-  confidence_threshold: 0.7                                # Minimum confidence score
-  extra_options: []                                        # Additional spchcat options
-  # Example extra options:
-  # extra_options: ['--enable-vad', '--vad-threshold=0.3']
+  confidence_threshold: 0.7                                # Minimum confidence score (estimated)
+  extra_options: []                                        # Additional spchcat command-line options
+  # Example extra options for spchcat:
+  # extra_options: ['--source=system']                     # Use system audio instead of microphone
+  
+  # Raspberry Pi Performance Optimization
+  max_concurrent_processing: 1                             # Max concurrent spchcat processes (1 for Pi)
+  process_priority: 10                                     # Process priority (lower = higher priority)
+  memory_limit_mb: 512                                     # Memory limit for spchcat process
+  
+  # Audio Quality Settings
+  min_audio_duration: 1.0                                  # Minimum audio duration for processing (seconds)
+  max_audio_duration: 60.0                                 # Maximum audio duration for processing (seconds)
+  sample_rate_check: true                                  # Verify audio sample rate before processing
 
 # Content Filtering Configuration
 content_filter:

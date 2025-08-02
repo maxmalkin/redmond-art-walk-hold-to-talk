@@ -119,9 +119,17 @@ class AudioDeviceManager:
         
         # Device health monitoring
         self.device_health_checks = deque(maxlen=100)
+
+        # USB hot-plug monitoring
+        self.monitoring_enabled = self.config.get('usb_devices', {}).get('hot_plug_monitoring', False)
+        self.monitoring_thread = None
+        self.stop_monitoring_event = threading.Event()
         
         # Initialize audio system
         self._initialize_audio()
+
+        if self.monitoring_enabled:
+            self._start_monitoring()
     
     def _initialize_audio(self):
         """Initialize PyAudio and detect devices."""
@@ -135,6 +143,38 @@ class AudioDeviceManager:
         except Exception as e:
             self.logger.error(f"Audio system initialization failed: {e}")
             raise
+
+    def _start_monitoring(self):
+        """Start USB hot-plug monitoring thread."""
+        if not USB_MONITORING_AVAILABLE:
+            self.logger.warning("PyUSB not available, cannot start hot-plug monitoring.")
+            return
+
+        self.monitoring_thread = threading.Thread(target=self._monitoring_worker, daemon=True)
+        self.monitoring_thread.start()
+        self.logger.info("Started USB hot-plug monitoring.")
+
+    def _monitoring_worker(self):
+        """Worker thread to monitor USB device changes."""
+        previous_devices = self._get_connected_usb_devices()
+        while not self.stop_monitoring_event.is_set():
+            time.sleep(self.config.get('usb_devices', {}).get('device_health_interval', 30))
+            current_devices = self._get_connected_usb_devices()
+            if current_devices != previous_devices:
+                self.logger.info("USB device change detected, refreshing devices.")
+                self.performance_stats['device_changes'] += 1
+                self.refresh_devices()
+                previous_devices = current_devices
+
+    def _get_connected_usb_devices(self):
+        """Get a set of connected USB device identifiers."""
+        devices = set()
+        try:
+            for device in usb.core.find(find_all=True):
+                devices.add((device.idVendor, device.idProduct))
+        except usb.core.NoBackendError:
+            self.logger.warning("USB backend not found, cannot monitor devices.", exc_info=True)
+        return devices
     
     def _detect_devices(self):
         """Detect and configure USB audio devices."""
@@ -655,6 +695,9 @@ class AudioDeviceManager:
     def cleanup(self):
         """Clean up audio resources."""
         try:
+            if self.monitoring_thread and self.monitoring_thread.is_alive():
+                self.stop_monitoring_event.set()
+                self.monitoring_thread.join(timeout=5)
             if self.pyaudio_instance:
                 self.pyaudio_instance.terminate()
             self.logger.info("Audio device manager cleanup completed")
