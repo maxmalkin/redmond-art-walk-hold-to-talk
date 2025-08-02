@@ -1,0 +1,150 @@
+# Raspberry Pi Audio Recording & Processing System Configuration
+# This configuration file defines all system settings including GPIO mappings,
+# audio devices, speech processing, and channel associations.
+
+# GPIO Configuration - Button Pin Mappings
+# CRITICAL: Each recording button maps to its corresponding audio output:
+# REC_BUTTON_ONE → AUDIO_OUT_ONE → PHONE_UP_ONE (Channel 1)
+# REC_BUTTON_TWO → AUDIO_OUT_TWO → PHONE_UP_TWO (Channel 2)
+# etc.
+gpio:
+  # Recording buttons (hold-to-record) - BCM pin numbers
+  recording_buttons:
+    REC_BUTTON_ONE: 2      # Channel 1 recording trigger
+    REC_BUTTON_TWO: 3      # Channel 2 recording trigger  
+    REC_BUTTON_THREE: 4    # Channel 3 recording trigger
+    REC_BUTTON_FOUR: 17    # Channel 4 recording trigger
+    REC_BUTTON_FIVE: 27    # Channel 5 recording trigger
+  
+  # Playback buttons (momentary press) - BCM pin numbers
+  playback_buttons:
+    PHONE_UP_ONE: 22       # Channel 1 playback trigger
+    PHONE_UP_TWO: 10       # Channel 2 playback trigger
+    PHONE_UP_THREE: 9      # Channel 3 playback trigger
+    PHONE_UP_FOUR: 11      # Channel 4 playback trigger
+    PHONE_UP_FIVE: 5       # Channel 5 playback trigger
+  
+  # GPIO timing and behavior settings
+  debounce_time: 50        # Button debounce time (milliseconds)
+  hold_time: 100           # Minimum hold time for recording buttons (milliseconds)
+  poll_interval: 0.01      # GPIO polling interval (seconds) - 10ms for responsiveness
+
+# Audio Device Configuration
+audio:
+  sample_rate: 44100           # Audio sample rate (Hz)
+  chunk_size: 1024             # Audio processing chunk size
+  format: 'paInt16'            # Audio format (paInt16, paInt24, paInt32)
+  channels: 1                  # Number of audio channels (mono)
+  max_recording_duration: 300  # Maximum recording length (seconds)
+
+# USB Audio Device Configuration
+usb_devices:
+  # Preferred USB audio device vendor IDs (hexadecimal)
+  preferred_vendors: [0x046d, 0x0b05, 0x1b3f]  # Logitech, ASUS, Generalplus
+  device_timeout: 5.0          # Device detection timeout (seconds)
+  hot_plug_monitoring: true    # Enable USB hot-plug monitoring
+  auto_reconnect: true         # Automatically reconnect lost devices
+  device_health_interval: 30   # Device health check interval (seconds)
+
+# spchcat Speech-to-Text Configuration (MANDATORY)
+# IMPORTANT: spchcat is the ONLY approved STT engine for this system
+spchcat:
+  binary_path: '/usr/local/bin/spchcat'                    # Path to spchcat binary
+  model_path: '/usr/local/share/spchcat/models'            # Path to language models
+  language: 'en'                                           # Language code
+  timeout: 30                                              # Processing timeout (seconds)
+  confidence_threshold: 0.7                                # Minimum confidence score
+  extra_options: []                                        # Additional spchcat options
+  # Example extra options:
+  # extra_options: ['--enable-vad', '--vad-threshold=0.3']
+
+# Content Filtering Configuration
+content_filter:
+  strict_mode: true              # Strict filtering mode
+  case_sensitive: false          # Case sensitive word matching
+  
+  # Words to filter (audio containing these goes to bin folder)
+  filtered_words:
+    - "inappropriate"
+    - "profanity"
+    - "offensive"
+    - "curse"
+    - "swear"
+    # Add your filtered words here
+  
+  # Phrases to filter (audio containing these goes to bin folder)
+  filtered_phrases:
+    - "inappropriate phrase"
+    - "offensive content"
+    # Add your filtered phrases here
+
+# File System Paths
+paths:
+  recordings: './recordings'     # Temporary recording storage
+  temp: './temp'                 # Temporary processing files
+  bin: './bin'                   # Filtered (blocked) audio files by channel
+  playable: './playable'         # Clean (playable) audio files by channel
+  logs: './logs'                 # System logs
+  backup: './backup'             # Backup storage
+
+# Processing Queue Configuration
+queue:
+  max_size: 100                  # Maximum queue size
+  max_workers: 2                 # Number of processing workers
+  processing_timeout: 120        # Processing timeout per file (seconds)
+
+# File Management Settings
+file_management:
+  max_temp_age_hours: 1          # Auto-delete temp files older than X hours
+  max_log_age_days: 30           # Auto-delete log files older than X days
+  backup_enabled: true           # Enable automatic backups
+  max_files_per_channel: 100     # Maximum files to keep per channel
+
+# Logging Configuration
+logging:
+  level: 'INFO'                  # Log level (DEBUG, INFO, WARNING, ERROR)
+  format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+  file: './logs/system.log'      # Log file path
+  max_size_mb: 10                # Maximum log file size (MB)
+  backup_count: 5                # Number of log backups to keep
+
+# System Settings
+system:
+  enable_hardware_monitoring: true    # Monitor hardware status
+  heartbeat_interval: 30              # System heartbeat interval (seconds)
+  auto_cleanup_interval: 3600         # Automatic cleanup interval (seconds)
+  startup_delay: 2                    # Startup delay (seconds)
+
+# Channel Mapping Documentation
+# This system maintains strict channel mapping throughout the pipeline:
+#
+# Channel 1: REC_BUTTON_ONE (GPIO 2) → MIC → STT → Filter → AUDIO_OUT_ONE → PHONE_UP_ONE (GPIO 22)
+# Channel 2: REC_BUTTON_TWO (GPIO 3) → MIC → STT → Filter → AUDIO_OUT_TWO → PHONE_UP_TWO (GPIO 10)
+# Channel 3: REC_BUTTON_THREE (GPIO 4) → MIC → STT → Filter → AUDIO_OUT_THREE → PHONE_UP_THREE (GPIO 9)
+# Channel 4: REC_BUTTON_FOUR (GPIO 17) → MIC → STT → Filter → AUDIO_OUT_FOUR → PHONE_UP_FOUR (GPIO 11)
+# Channel 5: REC_BUTTON_FIVE (GPIO 27) → MIC → STT → Filter → AUDIO_OUT_FIVE → PHONE_UP_FIVE (GPIO 5)
+#
+# Audio Flow:
+# 1. Hold REC_BUTTON_X → Start recording from USB microphone
+# 2. Release REC_BUTTON_X → Stop recording, queue for processing
+# 3. spchcat processes audio → speech-to-text conversion
+# 4. Content filter evaluates transcript → clean or filtered
+# 5. File moves to playable/channel_X or bin/channel_X accordingly
+# 6. Press PHONE_UP_X → Play latest clean audio through AUDIO_OUT_X
+#
+# Hardware Requirements:
+# - 1 USB microphone (MIC)
+# - 5 USB audio output devices (AUDIO_OUT_ONE through AUDIO_OUT_FIVE)
+# - 10 GPIO buttons (5 recording + 5 playback)
+# - spchcat binary and language models (MANDATORY)
+
+# Environment Variable Overrides
+# The following environment variables can override config values:
+# - AUDIO_SAMPLE_RATE: Override audio.sample_rate
+# - AUDIO_CHUNK_SIZE: Override audio.chunk_size  
+# - SPCHCAT_BINARY_PATH: Override spchcat.binary_path
+# - SPCHCAT_MODEL_PATH: Override spchcat.model_path
+# - SPCHCAT_LANGUAGE: Override spchcat.language
+# - LOG_LEVEL: Override logging.level
+# - MAX_FILES_PER_CHANNEL: Override file_management.max_files_per_channel
+# - BACKUP_ENABLED: Override file_management.backup_enabled

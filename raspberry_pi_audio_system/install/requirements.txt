@@ -1,0 +1,40 @@
+# Raspberry Pi Audio System Requirements
+# Install with: pip install -r requirements.txt
+
+# GPIO and Hardware Control
+RPi.GPIO>=0.7.1
+gpiozero>=1.6.2
+
+# Audio Processing
+pyaudio>=0.2.11
+wave>=0.0.2
+numpy>=1.21.0
+
+# Configuration Management
+PyYAML>=6.0
+
+# Threading and Async
+threading-timer>=0.1.7
+
+# File and System Operations
+psutil>=5.8.0
+
+# Logging
+colorlog>=6.7.0
+
+# USB Device Management
+pyusb>=1.2.1
+
+# Development and Testing (optional)
+pytest>=7.0.0
+pytest-cov>=4.0.0
+
+# System Monitoring
+watchdog>=2.1.0
+
+# Optional: Web interface dependencies (if web monitoring is desired)
+# flask>=2.0.0
+# flask-socketio>=5.0.0
+
+# Note: spchcat will be compiled and installed separately via spchcat_setup.sh
+# This is MANDATORY and cannot be replaced with other STT libraries
