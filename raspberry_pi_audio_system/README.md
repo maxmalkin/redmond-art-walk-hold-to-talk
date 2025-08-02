@@ -1,10 +1,11 @@
-# Raspberry Pi Multi-Button Audio Recording & Processing System
+# Redmond Art Walk - Hold to Talk Exhibit
 
 A comprehensive audio recording and processing system for Raspberry Pi that handles 5 independent recording/playback channels with real-time speech-to-text processing and content filtering.
 
 ## System Overview
 
 This system provides:
+
 - **5 GPIO recording buttons** (hold-to-record functionality)
 - **5 GPIO playback buttons** (momentary press to play)
 - **USB microphone input** for audio recording
@@ -17,15 +18,18 @@ This system provides:
 ## Hardware Requirements
 
 ### Audio Devices
+
 - 1 USB microphone (MIC)
 - 5 USB audio output devices (AUDIO_OUT_ONE through AUDIO_OUT_FIVE)
 
 ### GPIO Buttons
+
 - 10 GPIO buttons total:
   - 5 recording buttons (REC_BUTTON_ONE through REC_BUTTON_FIVE)
   - 5 playback buttons (PHONE_UP_ONE through PHONE_UP_FIVE)
 
 ### System Requirements
+
 - Raspberry Pi (3B+ or newer recommended)
 - MicroSD card (32GB+ recommended)
 - Raspberry Pi OS (Bullseye or newer)
@@ -46,6 +50,7 @@ Channel 5: REC_BUTTON_FIVE → MIC → STT → Filter → AUDIO_OUT_FIVE → PHO
 ## System Logic
 
 ### Recording Process
+
 1. **Hold REC_BUTTON_X** → Start recording from USB microphone
 2. **Release REC_BUTTON_X** → Stop recording, queue for processing
 3. **spchcat processes audio** → Speech-to-text conversion
@@ -53,6 +58,7 @@ Channel 5: REC_BUTTON_FIVE → MIC → STT → Filter → AUDIO_OUT_FIVE → PHO
 5. **File placement** → Moves to `playable/channel_X` or `bin/channel_X`
 
 ### Playback Process
+
 1. **Press PHONE_UP_X** → Trigger playback on channel X
 2. **System retrieves** → Latest clean audio file from `playable/channel_X`
 3. **Audio plays** → Through corresponding AUDIO_OUT_X device
@@ -62,12 +68,14 @@ Channel 5: REC_BUTTON_FIVE → MIC → STT → Filter → AUDIO_OUT_FIVE → PHO
 ### Automated Installation
 
 1. **Clone or download the system:**
+
    ```bash
    cd /home/pi
    # Copy the raspberry_pi_audio_system directory to your Pi
    ```
 
 2. **Run the installation script:**
+
    ```bash
    cd raspberry_pi_audio_system
    chmod +x install/setup.sh
@@ -88,6 +96,7 @@ Channel 5: REC_BUTTON_FIVE → MIC → STT → Filter → AUDIO_OUT_FIVE → PHO
 If you prefer manual installation:
 
 1. **Install system dependencies:**
+
    ```bash
    sudo apt-get update
    sudo apt-get install -y python3 python3-pip python3-venv python3-dev
@@ -97,6 +106,7 @@ If you prefer manual installation:
    ```
 
 2. **Create virtual environment:**
+
    ```bash
    python3 -m venv venv
    source venv/bin/activate
@@ -104,6 +114,7 @@ If you prefer manual installation:
    ```
 
 3. **Install spchcat (MANDATORY):**
+
    ```bash
    chmod +x install/spchcat_setup.sh
    ./install/spchcat_setup.sh
@@ -136,13 +147,13 @@ gpio:
 audio:
   sample_rate: 44100
   chunk_size: 1024
-  format: 'paInt16'
+  format: "paInt16"
 
 # spchcat configuration (MANDATORY)
 spchcat:
-  binary_path: '/usr/local/bin/spchcat'
-  model_path: '/usr/local/share/spchcat/models'
-  language: 'en'
+  binary_path: "/usr/local/bin/spchcat"
+  model_path: "/usr/local/share/spchcat/models"
+  language: "en"
   confidence_threshold: 0.7
 
 # Content filtering
@@ -170,6 +181,7 @@ export LOG_LEVEL=DEBUG
 ### Starting the System
 
 #### Manual Start
+
 ```bash
 cd raspberry_pi_audio_system
 source venv/bin/activate
@@ -177,12 +189,14 @@ python main.py
 ```
 
 #### With Systemd Service
+
 ```bash
 sudo systemctl start raspberry-pi-audio
 sudo systemctl status raspberry-pi-audio
 ```
 
 #### Test Mode
+
 ```bash
 python main.py --test-mode
 ```
@@ -190,12 +204,14 @@ python main.py --test-mode
 ### System Operation
 
 1. **Recording:**
+
    - Hold any REC_BUTTON (1-5) to start recording
    - Release to stop and process the recording
    - Audio is processed through spchcat for speech-to-text
    - Content is filtered and placed in appropriate folder
 
 2. **Playback:**
+
    - Press any PHONE_UP button (1-5) to play the latest clean recording from that channel
    - Audio plays through the corresponding USB audio output
 
@@ -247,6 +263,7 @@ raspberry_pi_audio_system/
 ## File Organization
 
 ### Channel-Based Organization
+
 - `playable/channel_1/` - Clean audio files for channel 1
 - `playable/channel_2/` - Clean audio files for channel 2
 - `bin/channel_1/` - Filtered audio files for channel 1
@@ -254,6 +271,7 @@ raspberry_pi_audio_system/
 - etc.
 
 ### Processing Flow
+
 1. **Recording** → `temp/` (during recording)
 2. **Processing** → spchcat analysis + content filtering
 3. **Clean Audio** → `playable/channel_X/`
@@ -266,17 +284,19 @@ raspberry_pi_audio_system/
 This system uses spchcat as the ONLY approved speech-to-text engine. Other STT solutions are not supported.
 
 **Key Features:**
+
 - Real-time speech recognition
 - Configurable confidence thresholds
 - Multiple language support
 - Optimized for Raspberry Pi
 
 **Configuration:**
+
 ```yaml
 spchcat:
-  binary_path: '/usr/local/bin/spchcat'
-  model_path: '/usr/local/share/spchcat/models'
-  language: 'en'
+  binary_path: "/usr/local/bin/spchcat"
+  model_path: "/usr/local/share/spchcat/models"
+  language: "en"
   timeout: 30
   confidence_threshold: 0.7
 ```
@@ -289,12 +309,12 @@ The content filter evaluates speech transcripts against configured word and phra
 
 ```yaml
 content_filter:
-  strict_mode: true           # Any match = filtered
-  case_sensitive: false       # Case insensitive matching
-  filtered_words:             # Individual words to filter
+  strict_mode: true # Any match = filtered
+  case_sensitive: false # Case insensitive matching
+  filtered_words: # Individual words to filter
     - "inappropriate"
     - "profanity"
-  filtered_phrases:           # Phrases to filter
+  filtered_phrases: # Phrases to filter
     - "inappropriate phrase"
 ```
 
@@ -310,14 +330,16 @@ content_filter:
 ### Logging
 
 Logs are written to `logs/system.log` with configurable levels:
+
 - DEBUG: Detailed debugging information
-- INFO: General system information  
+- INFO: General system information
 - WARNING: Warning conditions
 - ERROR: Error conditions
 
 ### Automatic Maintenance
 
 The system performs automatic maintenance:
+
 - **Temporary File Cleanup** - Removes old temp files
 - **Log Rotation** - Manages log file sizes
 - **File Limits** - Maintains max files per channel
@@ -341,6 +363,7 @@ find temp/ -mtime +1 -delete
 ### Common Issues
 
 #### spchcat Not Found
+
 ```bash
 # Verify spchcat installation
 which spchcat
@@ -351,6 +374,7 @@ spchcat --version
 ```
 
 #### Audio Device Issues
+
 ```bash
 # List audio devices
 aplay -l
@@ -361,6 +385,7 @@ speaker-test -c 1 -t sine
 ```
 
 #### GPIO Permission Issues
+
 ```bash
 # Check GPIO group membership
 groups $USER
@@ -371,12 +396,14 @@ sudo usermod -a -G gpio $USER
 ```
 
 #### No Audio Recording
+
 - Check USB microphone connection
 - Verify audio device permissions
 - Check ALSA/PulseAudio configuration
 - Test with: `arecord -D hw:1 test.wav`
 
-#### No Audio Playback  
+#### No Audio Playback
+
 - Verify USB audio output devices
 - Check channel mapping in config.yaml
 - Test each output device individually
@@ -385,19 +412,22 @@ sudo usermod -a -G gpio $USER
 ### Debug Mode
 
 Enable verbose logging:
+
 ```bash
 python main.py --verbose
 ```
 
 Or set in config:
+
 ```yaml
 logging:
-  level: 'DEBUG'
+  level: "DEBUG"
 ```
 
 ### System Status
 
 Check system status:
+
 ```bash
 # If running as service
 sudo systemctl status raspberry-pi-audio
@@ -445,9 +475,9 @@ python -c "from processing.speech_processor import SpeechProcessor; print('spchc
 ```yaml
 # Optimize for performance
 audio:
-  chunk_size: 2048          # Larger chunks = less CPU overhead
+  chunk_size: 2048 # Larger chunks = less CPU overhead
 queue:
-  max_workers: 1            # Fewer workers on slower Pi models
+  max_workers: 1 # Fewer workers on slower Pi models
 spchcat:
   confidence_threshold: 0.8 # Higher threshold = faster processing
 ```
@@ -471,6 +501,7 @@ spchcat:
 ### System Requirements Verification
 
 Run the verification script:
+
 ```bash
 python main.py --test-mode --verbose
 ```
