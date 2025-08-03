@@ -7,14 +7,10 @@ gpiozero>=1.6.2
 
 # Audio Processing
 pyaudio>=0.2.11
-wave>=0.0.2
-numpy>=1.21.0
+numpy>=1.19.0
 
 # Configuration Management
 PyYAML>=6.0
-
-# Threading and Async
-threading-timer>=0.1.7
 
 # File and System Operations
 psutil>=5.8.0
