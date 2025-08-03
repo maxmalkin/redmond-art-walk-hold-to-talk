@@ -90,7 +90,7 @@ class FileProcessingQueue:
         
         # Worker threads
         self.workers: List[threading.Thread] = []
-        self.stop_workers = threading.Event()
+        self._stop_event = threading.Event()
         
         # Statistics
         self.stats = {
@@ -172,7 +172,7 @@ class FileProcessingQueue:
         """
         self.logger.info(f"Started queue worker {worker_id}")
         
-        while not self.stop_workers.is_set():
+        while not self._stop_event.is_set():
             try:
                 # Get next task from queue (with timeout to allow checking stop signal)
                 try:
@@ -460,7 +460,7 @@ class FileProcessingQueue:
         """Stop all worker threads."""
         self.logger.info("Stopping queue workers")
         
-        self.stop_workers.set()
+        self._stop_event.set()
         
         # Wait for workers to finish
         for worker in self.workers:
