@@ -32,8 +32,7 @@ This system provides:
 
 - Raspberry Pi (3B+ or newer recommended)
 - MicroSD card (32GB+ recommended)
-- Raspberry Pi OS (Bullseye or newer)
-- Internet connection for initial setup
+- Raspberry Pi OS
 
 ## Channel Mapping
 
