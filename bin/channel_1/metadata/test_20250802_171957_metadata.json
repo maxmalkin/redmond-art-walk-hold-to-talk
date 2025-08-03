@@ -1,0 +1,78 @@
+{
+  "channel": 1,
+  "timestamp": "2025-08-02T17:19:57.048174",
+  "processing_time_seconds": 0.0008614063262939453,
+  "original_audio_file": "test.wav",
+  "destination_paths": {
+    "transcript": "./bin/channel_1/transcripts/test_20250802_171957.txt",
+    "metadata": "./bin/channel_1/metadata/test_20250802_171957_metadata.json",
+    "reasons": "./bin/channel_1/filtered_reasons/test_20250802_171957_reasons.json"
+  },
+  "transcript": "this is a badword",
+  "transcript_length": 17,
+  "word_count": 4,
+  "is_acceptable": false,
+  "stt_confidence": 0.9,
+  "filter_results": {
+    "quality_assessment": {
+      "length_check": {
+        "passed": true,
+        "score": 0.8334975369458129,
+        "details": "Good length: 17 characters, 4 words"
+      },
+      "confidence_check": {
+        "passed": true,
+        "score": 0.9,
+        "details": "Good confidence: 0.90"
+      },
+      "intelligibility_check": {
+        "passed": true,
+        "score": 0.7,
+        "details": "Good intelligibility: 0.70"
+      },
+      "coherence_check": {
+        "passed": true,
+        "score": 0.7999999999999999,
+        "details": "Coherence score: 0.80"
+      },
+      "overall_quality_score": 0.8083743842364532
+    },
+    "content_filters": {
+      "profanity": {
+        "words": [
+          "badword"
+        ],
+        "phrases": [],
+        "patterns": [],
+        "total_hits": 1
+      },
+      "sensitive": {
+        "words": [],
+        "phrases": [],
+        "patterns": [],
+        "total_hits": 0
+      },
+      "custom": {
+        "words": [],
+        "phrases": [],
+        "patterns": [],
+        "total_hits": 0
+      }
+    },
+    "channel_specific": {
+      "mode_override": null,
+      "additional_filters": [],
+      "bypass_filters": [],
+      "custom_rules_applied": []
+    },
+    "overall_score": 0.5083743842364532,
+    "analysis_confidence": "high",
+    "filter_mode": "strict",
+    "processing_time": "2025-08-02T17:19:57.047633"
+  },
+  "filter_mode": "strict",
+  "processor_version": "1.0.0",
+  "emergency_bypass": false,
+  "maintenance_mode": false,
+  "original_metadata": {}
+}
