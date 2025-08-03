@@ -243,41 +243,9 @@ class FileProcessingQueue:
             Speech processing results or None if failed
         """
         try:
-            # Use a threading event to wait for speech processing completion
-            result_event = threading.Event()
-            speech_result = {}
-            
-            def speech_callback(channel, audio_file, transcript, confidence, metadata):
-                speech_result.update({
-                    'channel': channel,
-                    'audio_file': audio_file,
-                    'transcript': transcript,
-                    'confidence': confidence,
-                    'metadata': metadata
-                })
-                result_event.set()
-            
-            # Temporarily set callback
-            original_callback = self.speech_processor.processing_callback
-            self.speech_processor.set_processing_callback(speech_callback)
-            
-            # Submit to speech processor
-            success = self.speech_processor.process_audio_file(
+            return self.speech_processor.process_audio_file(
                 task.channel, task.audio_file, task.metadata
             )
-            
-            if not success:
-                return None
-            
-            # Wait for processing completion
-            if result_event.wait(timeout=self.processing_timeout):
-                # Restore original callback
-                self.speech_processor.set_processing_callback(original_callback)
-                return speech_result
-            else:
-                self.logger.error(f"Speech processing timeout for task {task.task_id}")
-                return None
-                
         except Exception as e:
             self.logger.error(f"Speech processing error for task {task.task_id}: {e}")
             return None

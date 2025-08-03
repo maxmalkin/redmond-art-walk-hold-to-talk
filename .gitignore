@@ -1,1 +1,15 @@
 GEMINI.md
+raspberry_pi_audio_system/queue/__pycache__/__init__.cpython-313.pyc
+raspberry_pi_audio_system/queue/__pycache__/file_queue.cpython-313.pyc
+raspberry_pi_audio_system/tests/__pycache__/test_content_filter.cpython-313.pyc
+raspberry_pi_audio_system/tests/__pycache__/test_file_queue.cpython-313.pyc
+raspberry_pi_audio_system/processing/__pycache__/__init__.cpython-313.pyc
+raspberry_pi_audio_system/processing/__pycache__/content_filter.cpython-313.pyc
+raspberry_pi_audio_system/processing/__pycache__/recorder.cpython-313.pyc
+raspberry_pi_audio_system/processing/__pycache__/speech_processor.cpython-313.pyc
+raspberry_pi_audio_system/queue/__pycache__/__init__.cpython-313.pyc
+raspberry_pi_audio_system/queue/__pycache__/file_queue.cpython-313.pyc
+raspberry_pi_audio_system/task_queue/__pycache__/__init__.cpython-313.pyc
+raspberry_pi_audio_system/task_queue/__pycache__/file_queue.cpython-313.pyc
+raspberry_pi_audio_system/queue/__pycache__/__init__.cpython-313.pyc
+raspberry_pi_audio_system/queue/__pycache__/file_queue.cpython-313.pyc

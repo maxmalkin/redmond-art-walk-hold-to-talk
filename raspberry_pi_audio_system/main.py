@@ -36,7 +36,7 @@ from hardware.audio_devices import AudioDeviceManager
 from processing.recorder import AudioRecorder
 from processing.speech_processor import SpeechProcessor
 from processing.content_filter import ContentFilter
-from queue.file_queue import FileProcessingQueue
+from task_queue.file_queue import FileProcessingQueue
 from playback.output_manager import AudioOutputManager
 
 
