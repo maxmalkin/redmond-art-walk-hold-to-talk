@@ -14,3 +14,6 @@ raspberry_pi_audio_system/task_queue/__pycache__/file_queue.cpython-313.pyc
 raspberry_pi_audio_system/queue/__pycache__/__init__.cpython-313.pyc
 raspberry_pi_audio_system/queue/__pycache__/file_queue.cpython-313.pyc
 CLAUDE.md
+raspberry_pi_audio_system/utils/__pycache__/__init__.cpython-313.pyc
+raspberry_pi_audio_system/utils/__pycache__/config.cpython-313.pyc
+raspberry_pi_audio_system/utils/__pycache__/file_manager.cpython-313.pyc
