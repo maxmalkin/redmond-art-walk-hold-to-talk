@@ -32,38 +32,38 @@ info() {
 
 # Configuration
 SPCHCAT_REPO="https://github.com/petewarden/spchcat"
-SPCHCAT_BINARY_URL_X86="https://github.com/petewarden/spchcat/releases/download/v0.1.0/spchcat_linux_x86_64"
-SPCHCAT_BINARY_URL_ARM="https://github.com/petewarden/spchcat/releases/download/v0.1.0/spchcat_linux_arm64"
-SPCHCAT_BINARY_URL_ARM32="https://github.com/petewarden/spchcat/releases/download/v0.1.0/spchcat_linux_armv7"
-INSTALL_PREFIX="/usr/local"
+SPCHCAT_DEB_URL_X86="https://github.com/petewarden/spchcat/releases/download/v0.0.2-alpha/spchcat_0.0-2_amd64.deb"
+SPCHCAT_DEB_URL_RPI="https://github.com/petewarden/spchcat/releases/download/v0.0.2-rpi-alpha/spchcat_0.0-2_armhf.deb"
 TEMP_DIR="/tmp/spchcat_install"
 
-# Detect system architecture
+# Detect system architecture and get appropriate .deb package
 detect_architecture() {
     local arch=$(uname -m)
-    local binary_url=""
+    local deb_url=""
     
-    case $arch in
-        x86_64)
-            binary_url="$SPCHCAT_BINARY_URL_X86"
-            info "Detected x86_64 architecture"
-            ;;
-        aarch64|arm64)
-            binary_url="$SPCHCAT_BINARY_URL_ARM"
-            info "Detected ARM64 architecture"
-            ;;
-        armv7l|arm*)
-            binary_url="$SPCHCAT_BINARY_URL_ARM32"
-            info "Detected ARM32 architecture"
-            ;;
-        *)
-            error "Unsupported architecture: $arch"
-            error "spchcat is available for x86_64, arm64, and armv7 only"
-            exit 1
-            ;;
-    esac
+    # Check if running on Raspberry Pi
+    if [ -f /proc/cpuinfo ] && grep -q "Raspberry Pi" /proc/cpuinfo; then
+        deb_url="$SPCHCAT_DEB_URL_RPI"
+        info "Detected Raspberry Pi - using armhf package"
+    else
+        case $arch in
+            x86_64)
+                deb_url="$SPCHCAT_DEB_URL_X86"
+                info "Detected x86_64 architecture"
+                ;;
+            aarch64|arm64|armv7l|arm*)
+                deb_url="$SPCHCAT_DEB_URL_RPI"
+                info "Detected ARM architecture - using Raspberry Pi package"
+                ;;
+            *)
+                error "Unsupported architecture: $arch"
+                error "spchcat is available for x86_64 and ARM (Raspberry Pi) only"
+                exit 1
+                ;;
+        esac
+    fi
     
-    echo "$binary_url"
+    echo "$deb_url"
 }
 
 # Check system requirements
@@ -84,10 +84,10 @@ check_requirements() {
         warn "You may also need: sudo apt-get install pulseaudio-utils"
     fi
     
-    # Check if we can write to install directory
-    if [ ! -w "$(dirname "$INSTALL_PREFIX/bin")" ] && [ "$EUID" -ne 0 ]; then
-        error "Cannot write to $INSTALL_PREFIX/bin. Please run with sudo or choose different install location."
-        info "This script will use sudo for installation when needed."
+    # Check for dpkg (required for .deb installation)
+    if ! command -v dpkg &> /dev/null; then
+        error "dpkg not found. This script requires a Debian-based system."
+        exit 1
     fi
     
     log "System requirements check completed"
@@ -130,63 +130,66 @@ setup_temp_directory() {
     log "Using temporary directory: $TEMP_DIR"
 }
 
-# Download spchcat binary
+# Download spchcat .deb package
 download_spchcat() {
-    local binary_url="$1"
+    local deb_url="$1"
+    local deb_file="spchcat.deb"
     
-    log "Downloading spchcat binary from: $binary_url"
+    log "Downloading spchcat .deb package from: $deb_url"
     
     if command -v wget &> /dev/null; then
-        wget -O spchcat "$binary_url"
+        wget -O "$deb_file" "$deb_url"
     elif command -v curl &> /dev/null; then
-        curl -L -o spchcat "$binary_url"
+        curl -L -o "$deb_file" "$deb_url"
     else
         error "Neither wget nor curl available for download"
         exit 1
     fi
     
-    if [ ! -f "spchcat" ]; then
-        error "Failed to download spchcat binary"
+    if [ ! -f "$deb_file" ]; then
+        error "Failed to download spchcat .deb package"
         exit 1
     fi
     
-    # Verify it's a valid binary
-    if ! file spchcat | grep -q "executable"; then
-        error "Downloaded file is not a valid executable"
+    # Verify it's a valid .deb file
+    if ! file "$deb_file" | grep -q "Debian binary package"; then
+        error "Downloaded file is not a valid .deb package"
         exit 1
     fi
     
-    log "spchcat binary downloaded successfully"
+    log "spchcat .deb package downloaded successfully"
 }
 
-# Install spchcat binary
+# Install spchcat .deb package
 install_spchcat() {
-    log "Installing spchcat to $INSTALL_PREFIX/bin..."
+    local deb_file="spchcat.deb"
     
-    # Make binary executable
-    chmod +x spchcat
+    log "Installing spchcat .deb package..."
     
-    # Create bin directory if it doesn't exist
-    sudo mkdir -p "$INSTALL_PREFIX/bin"
+    # Install the .deb package
+    sudo dpkg -i "$deb_file"
     
-    # Install binary
-    sudo cp spchcat "$INSTALL_PREFIX/bin/spchcat"
-    
-    # Verify installation
-    if [ -f "$INSTALL_PREFIX/bin/spchcat" ]; then
-        log "spchcat installed successfully to $INSTALL_PREFIX/bin/spchcat"
-    else
-        error "Failed to install spchcat binary"
-        exit 1
+    # Fix any dependency issues
+    if [ $? -ne 0 ]; then
+        warn "dpkg installation had issues, attempting to fix dependencies..."
+        sudo apt-get install -f -y
+        
+        # Try installation again
+        sudo dpkg -i "$deb_file"
+        if [ $? -ne 0 ]; then
+            error "Failed to install spchcat .deb package"
+            exit 1
+        fi
     fi
     
-    # Make sure it's in PATH
-    if ! command -v spchcat &> /dev/null; then
-        warn "spchcat not found in PATH"
-        warn "You may need to add $INSTALL_PREFIX/bin to your PATH"
-        warn "Add this to your ~/.bashrc: export PATH=\"$INSTALL_PREFIX/bin:\$PATH\""
-    else
+    log "spchcat .deb package installed successfully"
+    
+    # Verify installation
+    if command -v spchcat &> /dev/null; then
         log "spchcat is available in PATH"
+    else
+        error "spchcat installation verification failed - not found in PATH"
+        exit 1
     fi
 }
 
@@ -288,7 +291,7 @@ main() {
     fi
     
     # Detect architecture and get download URL
-    local binary_url=$(detect_architecture)
+    local deb_url=$(detect_architecture)
     
     # Check system requirements
     check_requirements
@@ -299,8 +302,8 @@ main() {
     # Setup temporary directory
     setup_temp_directory
     
-    # Download spchcat binary
-    download_spchcat "$binary_url"
+    # Download spchcat .deb package
+    download_spchcat "$deb_url"
     
     # Install spchcat
     install_spchcat
@@ -313,7 +316,7 @@ main() {
     
     log "spchcat installation completed successfully!"
     echo
-    info "spchcat has been installed to: $INSTALL_PREFIX/bin/spchcat"
+    info "spchcat has been installed via .deb package"
     info "Configuration notes: $HOME/.config/raspberry_pi_audio_system/spchcat_usage.txt"
     echo
     info "You can test spchcat with: spchcat --help"

@@ -48,15 +48,15 @@ usb_devices:
 
 # spchcat Speech-to-Text Configuration (MANDATORY)
 # IMPORTANT: spchcat is the ONLY approved STT engine for this system
-# spchcat is a pre-built binary available from https://github.com/petewarden/spchcat
+# spchcat is installed via .deb package from https://github.com/petewarden/spchcat
 spchcat:
-  binary_path: '/usr/local/bin/spchcat'                    # Path to spchcat binary
+  binary_path: '/usr/bin/spchcat'                          # Path to spchcat binary (installed via .deb)
   language: 'en'                                           # Language code (en, es, fr, de, it, pt, etc.)
   timeout: 30                                              # Processing timeout (seconds)
   confidence_threshold: 0.7                                # Minimum confidence score (estimated)
   extra_options: []                                        # Additional spchcat command-line options
   # Example extra options for spchcat:
-  # extra_options: ['--source=system']                     # Use system audio instead of microphone
+  # extra_options: ['--model=/path/to/model']              # Use specific model file
   
   # Raspberry Pi Performance Optimization
   max_concurrent_processing: 1                             # Max concurrent spchcat processes (1 for Pi)
@@ -153,7 +153,6 @@ system:
 # - AUDIO_SAMPLE_RATE: Override audio.sample_rate
 # - AUDIO_CHUNK_SIZE: Override audio.chunk_size  
 # - SPCHCAT_BINARY_PATH: Override spchcat.binary_path
-# - SPCHCAT_MODEL_PATH: Override spchcat.model_path
 # - SPCHCAT_LANGUAGE: Override spchcat.language
 # - LOG_LEVEL: Override logging.level
 # - MAX_FILES_PER_CHANNEL: Override file_management.max_files_per_channel
