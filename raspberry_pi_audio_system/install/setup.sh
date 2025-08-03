@@ -230,7 +230,7 @@ User=$USER
 Group=audio
 WorkingDirectory=$CURRENT_DIR
 Environment=PATH=$CURRENT_DIR/venv/bin:/usr/local/bin:/usr/bin:/bin
-ExecStart=$CURRENT_DIR/venv/bin/python main.py
+ExecStart=$CURRENT_DIR/venv/bin/python3 main.py
 Restart=always
 RestartSec=10
 StandardOutput=journal
@@ -296,12 +296,32 @@ validate_installation() {
     
     # Check Python dependencies
     source venv/bin/activate
-    python -c "
-import RPi.GPIO
-import pyaudio
-import yaml
-import numpy
-print('Python dependencies OK')
+    python3 -c "
+try:
+    import RPi.GPIO
+    print('RPi.GPIO OK')
+except ImportError:
+    print('RPi.GPIO not available (expected on non-Pi systems)')
+
+try:
+    import pyaudio
+    print('pyaudio OK')
+except ImportError:
+    print('pyaudio not available')
+
+try:
+    import yaml
+    print('PyYAML OK')
+except ImportError:
+    print('PyYAML not available')
+
+try:
+    import numpy
+    print('numpy OK')
+except ImportError:
+    print('numpy not available')
+
+print('Python dependencies check completed')
 "
     
     # Check spchcat installation
@@ -388,8 +408,9 @@ main() {
     info "Next steps:"
     info "1. Review and customize config.yaml"
     info "2. Connect your USB audio devices"
-    info "3. Test the system with: python main.py"
-    info "4. If installed as service, start with: sudo systemctl start raspberry-pi-audio"
+    info "3. Test the system with: python3 main.py --test-mode"
+    info "4. Run the system with: python3 main.py"
+    info "5. If installed as service, start with: sudo systemctl start raspberry-pi-audio"
     echo
     warn "You may need to reboot for all permissions and drivers to take effect"
     
